@@ -1,145 +1,131 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
-import yt_dlp
-import os
-import uuid
-import threading
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>YT Downloader Pro</title>
 
-app = Flask(__name__)
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: linear-gradient(135deg, #0f172a, #020617);
+    color: white;
+    text-align: center;
+}
 
-DOWNLOAD_FOLDER = "downloads"
+.container {
+    margin-top: 100px;
+}
 
-if not os.path.exists(DOWNLOAD_FOLDER):
-    os.makedirs(DOWNLOAD_FOLDER)
+input {
+    width: 400px;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 16px;
+}
 
-progress_data = {}
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+    margin: 10px;
+}
 
-# ---------------- HOME ----------------
-@app.route("/")
-def home():
-    return render_template("index.html")
+.progress {
+    width: 400px;
+    height: 10px;
+    background: #333;
+    margin: 20px auto;
+    border-radius: 5px;
+}
 
+.bar {
+    height: 100%;
+    width: 0%;
+    background: lime;
+}
+</style>
+</head>
 
-# ---------------- VIDEO INFO ----------------
-@app.route("/info")
-def info():
-    url = request.args.get("url")
+<body>
 
-    try:
-        ydl_opts = {
-            'quiet': True,
-            'cookiefile': 'cookies.txt'
+<div class="container">
+    <h1>⚡ YT Downloader Pro</h1>
+
+    <input id="url" placeholder="Paste YouTube URL"><br>
+    <button onclick="preview()">Preview</button>
+
+    <div id="info"></div>
+
+    <button onclick="download('video')">Download Video</button>
+    <button onclick="download('mp3')">Download MP3</button>
+
+    <div class="progress">
+        <div class="bar" id="bar"></div>
+    </div>
+
+    <div id="status"></div>
+</div>
+
+<script>
+let currentId = null;
+
+function preview() {
+    let url = document.getElementById("url").value;
+
+    fetch(`/info?url=${encodeURIComponent(url)}`)
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById("info").innerText = data.error;
+            return;
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            data = ydl.extract_info(url, download=False)
+        document.getElementById("info").innerHTML = `
+            <h3>${data.title}</h3>
+            <img src="${data.thumbnail}" width="300">
+        `;
+    });
+}
 
-        formats = []
-        seen = set()
+function download(type) {
+    let url = document.getElementById("url").value;
 
-        for f in data.get("formats", []):
-            if f.get("height"):
-                h = f.get("height")
+    fetch("/download", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({url: url, type: type})
+    })
+    .then(res => res.json())
+    .then(data => {
+        currentId = data.id;
+        checkProgress();
+    });
+}
 
-                if h not in seen:
-                    seen.add(h)
-                    formats.append({
-                        "quality": f"{h}p",
-                        "height": h
-                    })
+function checkProgress() {
+    if (!currentId) return;
 
-        formats = sorted(formats, key=lambda x: x["height"], reverse=True)
+    fetch(`/progress/${currentId}`)
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("bar").style.width = data.percent;
+        document.getElementById("status").innerText = data.percent + " " + data.speed;
 
-        return jsonify({
-            "title": data.get("title"),
-            "thumbnail": data.get("thumbnail"),
-            "formats": formats
-        })
+        if (data.percent === "100%") {
+            window.location = `/file/${currentId}`;
+        } else if (data.percent !== "error") {
+            setTimeout(checkProgress, 1000);
+        } else {
+            document.getElementById("status").innerText = data.speed;
+        }
+    });
+}
+</script>
 
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-
-# ---------------- DOWNLOAD THREAD ----------------
-def download_task(url, file_id, format_type, quality):
-
-    def hook(d):
-        if d['status'] == 'downloading':
-            progress_data[file_id] = {
-                "percent": d.get('_percent_str', '0%'),
-                "speed": d.get('_speed_str', '')
-            }
-
-        elif d['status'] == 'finished':
-            progress_data[file_id] = {
-                "percent": "100%",
-                "speed": "Processing..."
-            }
-
-    try:
-        if format_type == "mp3":
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
-                'progress_hooks': [hook],
-                'cookiefile': 'cookies.txt',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': quality,
-                }],
-            }
-
-        else:
-            # 🔥 ULTRA SAFE FORMAT (NEVER FAILS)
-            fmt = f"best[height<={quality}]/best"
-
-            ydl_opts = {
-                'format': fmt,
-                'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
-                'progress_hooks': [hook],
-                'cookiefile': 'cookies.txt'
-            }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-
-    except Exception as e:
-        progress_data[file_id] = {"percent": "error", "speed": str(e)}
-
-
-# ---------------- START DOWNLOAD ----------------
-@app.route("/download", methods=["POST"])
-def download():
-    data = request.json
-
-    url = data.get("url")
-    format_type = data.get("type")
-    quality = data.get("quality")
-
-    file_id = str(uuid.uuid4())
-
-    progress_data[file_id] = {"percent": "0%", "speed": ""}
-
-    threading.Thread(target=download_task, args=(url, file_id, format_type, quality)).start()
-
-    return jsonify({"id": file_id})
-
-
-# ---------------- PROGRESS ----------------
-@app.route("/progress/<file_id>")
-def progress(file_id):
-    return jsonify(progress_data.get(file_id, {"percent": "0%", "speed": ""}))
-
-
-# ---------------- DOWNLOAD FILE ----------------
-@app.route("/file/<file_id>")
-def file(file_id):
-    for f in os.listdir(DOWNLOAD_FOLDER):
-        if f.startswith(file_id):
-            return send_from_directory(DOWNLOAD_FOLDER, f, as_attachment=True)
-    return "File not found"
-
-
-# ---------------- RUN ----------------
-if __name__ == "__main__":
-    app.run(debug=True)
+</body>
+</html>
