@@ -37,7 +37,7 @@ def info():
         seen = set()
 
         for f in data.get("formats", []):
-            if f.get("height") and f.get("ext") == "mp4":
+            if f.get("height"):
                 h = f.get("height")
 
                 if h not in seen:
@@ -90,15 +90,14 @@ def download_task(url, file_id, format_type, quality):
             }
 
         else:
-            # ✅ SMART SAFE FORMAT
-            fmt = f"bestvideo[height<={quality}]+bestaudio/best/best"
+            # 🔥 ULTRA SAFE FORMAT (NEVER FAILS)
+            fmt = f"best[height<={quality}]/best"
 
             ydl_opts = {
                 'format': fmt,
                 'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
                 'progress_hooks': [hook],
-                'cookiefile': 'cookies.txt',
-                'merge_output_format': 'mp4'
+                'cookiefile': 'cookies.txt'
             }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
