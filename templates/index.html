@@ -1,153 +1,129 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>YT Downloader Pro</title>
-    <style>
-        body {
-            background: linear-gradient(135deg, #0f172a, #020617);
-            font-family: Arial;
-            color: white;
-            text-align: center;
-        }
+<meta charset="UTF-8">
+<title>YT Downloader Pro</title>
 
-        .box {
-            margin: 80px auto;
-            width: 420px;
-            padding: 30px;
-            border-radius: 20px;
-            background: #111827;
-            box-shadow: 0 0 25px rgba(0,0,0,0.5);
-        }
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: linear-gradient(135deg, #0f172a, #020617);
+    color: white;
+    text-align: center;
+}
 
-        input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            border: none;
-            margin-bottom: 15px;
-        }
+.container {
+    margin-top: 100px;
+}
 
-        button {
-            padding: 10px 15px;
-            border-radius: 10px;
-            border: none;
-            background: #3b82f6;
-            color: white;
-            cursor: pointer;
-            margin: 5px;
-        }
+input {
+    width: 400px;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 16px;
+}
 
-        button:hover {
-            background: #2563eb;
-        }
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+    margin: 10px;
+}
 
-        img {
-            width: 100%;
-            border-radius: 10px;
-            margin-top: 10px;
-        }
+.progress {
+    width: 400px;
+    height: 10px;
+    background: #333;
+    margin: 20px auto;
+    border-radius: 5px;
+}
 
-        .formats {
-            margin-top: 10px;
-        }
-
-        #status {
-            margin-top: 15px;
-        }
-    </style>
+.bar {
+    height: 100%;
+    width: 0%;
+    background: lime;
+}
+</style>
 </head>
+
 <body>
 
-<div class="box">
-    <h2>⚡ YT Downloader Pro</h2>
+<div class="container">
+    <h1>⚡ YT Downloader Pro</h1>
 
-    <input id="url" placeholder="Paste YouTube URL">
-
+    <input id="url" placeholder="Paste YouTube URL"><br>
     <button onclick="preview()">Preview</button>
 
-    <div id="previewBox"></div>
+    <div id="info"></div>
 
-    <div class="formats" id="formatsBox"></div>
+    <button onclick="download('video')">Download Video</button>
+    <button onclick="download('mp3')">Download MP3</button>
 
-    <button onclick="downloadMP3()">🎵 Download MP3</button>
+    <div class="progress">
+        <div class="bar" id="bar"></div>
+    </div>
 
-    <p id="status"></p>
+    <div id="status"></div>
 </div>
 
 <script>
-let currentUrl = "";
+let currentId = null;
 
-function preview(){
+function preview() {
     let url = document.getElementById("url").value;
-    currentUrl = url;
 
-    fetch("/info?url=" + url)
+    fetch(`/info?url=${encodeURIComponent(url)}`)
     .then(res => res.json())
     .then(data => {
-
-        if(data.error){
-            document.getElementById("status").innerText = data.error;
+        if (data.error) {
+            document.getElementById("info").innerText = data.error;
             return;
         }
 
-        document.getElementById("previewBox").innerHTML = `
+        document.getElementById("info").innerHTML = `
             <h3>${data.title}</h3>
-            <img src="${data.thumbnail}">
+            <img src="${data.thumbnail}" width="300">
         `;
-
-        let html = "";
-
-        data.formats.forEach(f => {
-            html += `<button onclick="downloadVideo('${f.height}')">${f.quality}</button>`;
-        });
-
-        document.getElementById("formatsBox").innerHTML = html;
     });
 }
 
-function downloadVideo(quality){
-    startDownload("video", quality);
-}
+function download(type) {
+    let url = document.getElementById("url").value;
 
-function downloadMP3(){
-    startDownload("mp3", "128");
-}
-
-function startDownload(type, quality){
     fetch("/download", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            url: currentUrl,
-            type: type,
-            quality: quality
-        })
+        body: JSON.stringify({url: url, type: type})
     })
     .then(res => res.json())
     .then(data => {
-        track(data.id);
+        currentId = data.id;
+        checkProgress();
     });
 }
 
-function track(id){
-    let interval = setInterval(() => {
-        fetch("/progress/" + id)
-        .then(res => res.json())
-        .then(data => {
+function checkProgress() {
+    if (!currentId) return;
 
-            document.getElementById("status").innerText =
-                data.percent + " " + data.speed;
+    fetch(`/progress/${currentId}`)
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("bar").style.width = data.percent;
+        document.getElementById("status").innerText = data.percent + " " + data.speed;
 
-            if(data.percent === "100%"){
-                clearInterval(interval);
-                window.location = "/file/" + id;
-            }
-
-            if(data.percent === "error"){
-                clearInterval(interval);
-            }
-        });
-    }, 1000);
+        if (data.percent === "100%") {
+            window.location = `/file/${currentId}`;
+        } else if (data.percent !== "error") {
+            setTimeout(checkProgress, 1000);
+        } else {
+            document.getElementById("status").innerText = data.speed;
+        }
+    });
 }
 </script>
 
