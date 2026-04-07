@@ -1,92 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚡ YT Downloader Pro</title>
+<title>YT Downloader</title>
 <script src="https://cdn.tailwindcss.com"></script>
-
-<style>
-body {
-    background: radial-gradient(circle at 20% 20%, #0f172a, #020617 60%);
-}
-
-.glass {
-    background: rgba(255,255,255,0.05);
-    backdrop-filter: blur(25px);
-    border: 1px solid rgba(255,255,255,0.1);
-}
-
-.btn {
-    transition: 0.2s;
-}
-
-.btn:hover {
-    transform: scale(1.05);
-}
-</style>
 </head>
 
-<body class="text-white flex items-center justify-center min-h-screen">
+<body class="bg-black text-white flex justify-center items-center min-h-screen">
 
-<div class="glass p-6 sm:p-10 rounded-3xl w-full max-w-3xl">
+<div class="bg-gray-900 p-6 rounded-xl w-full max-w-xl">
 
-<h1 class="text-3xl sm:text-4xl font-bold text-center mb-6">
-⚡ YT Downloader Pro
-</h1>
+<h1 class="text-2xl mb-4 text-center">YT Downloader</h1>
 
-<!-- INPUT -->
-<input id="url"
-class="w-full p-4 rounded-xl bg-black/40 border border-gray-600"
-placeholder="Paste YouTube URL...">
+<input id="url" class="w-full p-2 text-black" placeholder="Paste URL">
 
-<!-- PREVIEW BUTTON -->
-<button onclick="preview()"
-class="btn w-full mt-5 p-3 rounded-xl bg-blue-600">
-Preview
-</button>
+<button onclick="preview()" class="bg-blue-500 w-full mt-3 p-2">Preview</button>
 
-<!-- LOADING -->
-<p id="loading" class="text-center mt-3 hidden text-blue-400">Loading...</p>
+<div id="preview" class="hidden mt-4 text-center">
+<img id="thumb" class="mx-auto mb-2">
+<p id="title"></p>
 
-<!-- PREVIEW SECTION -->
-<div id="previewBox" class="hidden mt-8 text-center">
+<button onclick="download('mp3','320')" class="bg-yellow-500 mt-2 p-2">MP3</button>
+<button onclick="download('video','720')" class="bg-green-500 mt-2 p-2">Video</button>
 
-<h2 id="title" class="text-lg sm:text-xl mb-4"></h2>
-
-<img id="thumb" class="rounded-xl w-full max-w-xs mx-auto">
-
-<!-- VIDEO BUTTONS -->
-<div class="flex flex-wrap justify-center gap-2 mt-5">
-<button onclick="download('video','max')" class="bg-green-500 px-3 py-2 rounded">MAX</button>
-<button onclick="download('video','1080')" class="bg-blue-500 px-3 py-2 rounded">1080p</button>
-<button onclick="download('video','720')" class="bg-blue-400 px-3 py-2 rounded">720p</button>
+<div class="mt-3">
+<div class="bg-gray-700 h-3">
+<div id="bar" class="bg-blue-500 h-3" style="width:0%"></div>
 </div>
-
-<!-- MP3 QUALITY -->
-<div class="mt-4">
-<p class="mb-2">MP3 Quality</p>
-
-<div class="flex justify-center gap-2 flex-wrap">
-<button onclick="download('mp3','128')" class="bg-yellow-400 px-3 py-1 rounded">128</button>
-<button onclick="download('mp3','192')" class="bg-yellow-500 px-3 py-1 rounded">192</button>
-<button onclick="download('mp3','320')" class="bg-yellow-600 px-3 py-1 rounded">320</button>
-</div>
-</div>
-
-<!-- THUMBNAIL -->
-<button onclick="downloadThumb()" class="mt-4 bg-purple-500 px-4 py-2 rounded">
-Download Thumbnail
-</button>
-
-<!-- PROGRESS -->
-<div class="mt-6">
-<div class="w-full h-4 bg-gray-700 rounded">
-<div id="bar" class="h-full bg-blue-500" style="width:0%"></div>
-</div>
-
-<p id="percent" class="mt-2 text-sm">0%</p>
-<p id="speed" class="text-xs text-gray-300"></p>
+<p id="percent"></p>
 </div>
 
 </div>
@@ -94,81 +34,49 @@ Download Thumbnail
 </div>
 
 <script>
-
 async function preview(){
-    let url = document.getElementById("url").value;
+let url = document.getElementById("url").value;
 
-    if(!url){
-        alert("Enter URL first");
-        return;
-    }
+let res = await fetch("/info?url="+url);
+let data = await res.json();
 
-    document.getElementById("loading").classList.remove("hidden");
+if(data.error){ alert(data.error); return; }
 
-    let res = await fetch("/info?url=" + encodeURIComponent(url));
-    let data = await res.json();
-
-    document.getElementById("loading").classList.add("hidden");
-
-    if(data.error){
-        alert(data.error);
-        return;
-    }
-
-    document.getElementById("previewBox").classList.remove("hidden");
-    document.getElementById("title").innerText = data.title;
-    document.getElementById("thumb").src = data.thumbnail;
+document.getElementById("preview").classList.remove("hidden");
+document.getElementById("thumb").src = data.thumbnail;
+document.getElementById("title").innerText = data.title;
 }
 
 async function download(type, quality){
-    let url = document.getElementById("url").value;
+let url = document.getElementById("url").value;
 
-    if(!url){
-        alert("Enter URL first");
-        return;
-    }
+let res = await fetch("/download", {
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body: JSON.stringify({url,type,quality})
+});
 
-    let res = await fetch("/download", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({url, type, quality})
-    });
-
-    let data = await res.json();
-    track(data.id);
+let data = await res.json();
+track(data.id);
 }
 
 function track(id){
-    let interval = setInterval(async () => {
+let i = setInterval(async()=>{
+let res = await fetch("/progress/"+id);
+let d = await res.json();
 
-        let res = await fetch("/progress/" + id);
-        let data = await res.json();
+let p = parseFloat(d.percent)||0;
 
-        if(data.percent === "error"){
-            clearInterval(interval);
-            alert("Error: " + data.speed);
-            return;
-        }
+document.getElementById("bar").style.width=p+"%";
+document.getElementById("percent").innerText=d.percent;
 
-        let p = parseFloat(data.percent.replace("%","")) || 0;
-
-        document.getElementById("bar").style.width = p + "%";
-        document.getElementById("percent").innerText = data.percent;
-        document.getElementById("speed").innerText = data.speed;
-
-        if(p >= 100){
-            clearInterval(interval);
-            window.location.href = "/file/" + id;
-        }
-
-    }, 700);
+if(p>=100){
+clearInterval(i);
+window.location="/file/"+id;
 }
 
-function downloadThumb(){
-    let img = document.getElementById("thumb").src;
-    window.open(img, "_blank");
+},1000);
 }
-
 </script>
 
 </body>
