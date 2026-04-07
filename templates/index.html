@@ -7,46 +7,48 @@
 <style>
 body {
     margin: 0;
-    font-family: Arial;
+    font-family: Arial, sans-serif;
     background: linear-gradient(135deg, #0f172a, #020617);
     color: white;
     text-align: center;
 }
 
 .container {
-    margin-top: 100px;
+    margin-top: 120px;
 }
 
 input {
-    width: 400px;
+    width: 420px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: none;
-    font-size: 16px;
+    outline: none;
 }
 
 button {
-    padding: 10px 20px;
+    margin-top: 15px;
+    padding: 10px 18px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     background: #3b82f6;
     color: white;
     cursor: pointer;
-    margin: 10px;
+    font-size: 14px;
 }
 
-.progress {
-    width: 400px;
-    height: 10px;
-    background: #333;
-    margin: 20px auto;
-    border-radius: 5px;
+button:hover {
+    background: #2563eb;
 }
 
-.bar {
-    height: 100%;
-    width: 0%;
-    background: lime;
+img {
+    margin-top: 20px;
+    width: 300px;
+    border-radius: 10px;
+}
+
+#status {
+    margin-top: 20px;
+    color: #f87171;
 }
 </style>
 </head>
@@ -54,77 +56,85 @@ button {
 <body>
 
 <div class="container">
-    <h1>⚡ YT Downloader Pro</h1>
 
-    <input id="url" placeholder="Paste YouTube URL"><br>
-    <button onclick="preview()">Preview</button>
+<h1>⚡ YT Downloader Pro</h1>
 
-    <div id="info"></div>
+<input id="url" placeholder="Paste YouTube URL here"><br>
 
-    <button onclick="download('video')">Download Video</button>
-    <button onclick="download('mp3')">Download MP3</button>
+<button onclick="preview()">Preview</button>
 
-    <div class="progress">
-        <div class="bar" id="bar"></div>
-    </div>
+<div id="result"></div>
 
-    <div id="status"></div>
+<br>
+
+<button onclick="downloadVideo()">Download Video</button>
+<button onclick="downloadMP3()">Download MP3</button>
+
+<p id="status"></p>
+
 </div>
 
 <script>
-let currentId = null;
 
 function preview() {
     let url = document.getElementById("url").value;
 
-    fetch(`/info?url=${encodeURIComponent(url)}`)
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) {
-            document.getElementById("info").innerText = data.error;
-            return;
-        }
+    document.getElementById("status").innerText = "Loading preview...";
 
-        document.getElementById("info").innerHTML = `
-            <h3>${data.title}</h3>
-            <img src="${data.thumbnail}" width="300">
-        `;
-    });
-}
-
-function download(type) {
-    let url = document.getElementById("url").value;
-
-    fetch("/download", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({url: url, type: type})
+    fetch('/preview', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'url=' + encodeURIComponent(url)
     })
     .then(res => res.json())
     .then(data => {
-        currentId = data.id;
-        checkProgress();
+        if (data.error) {
+            document.getElementById("status").innerText = data.error;
+        } else {
+            document.getElementById("status").innerText = "";
+
+            document.getElementById("result").innerHTML =
+                "<h3>" + data.title + "</h3>" +
+                "<img src='" + data.thumbnail + "'>";
+        }
+    })
+    .catch(err => {
+        document.getElementById("status").innerText = "Error: " + err;
     });
 }
 
-function checkProgress() {
-    if (!currentId) return;
 
-    fetch(`/progress/${currentId}`)
+function downloadVideo() {
+    sendDownload('video');
+}
+
+function downloadMP3() {
+    sendDownload('mp3');
+}
+
+function sendDownload(type) {
+    let url = document.getElementById("url").value;
+
+    document.getElementById("status").innerText = "Downloading...";
+
+    fetch('/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'url=' + encodeURIComponent(url) + '&format=' + type
+    })
     .then(res => res.json())
     .then(data => {
-        document.getElementById("bar").style.width = data.percent;
-        document.getElementById("status").innerText = data.percent + " " + data.speed;
-
-        if (data.percent === "100%") {
-            window.location = `/file/${currentId}`;
-        } else if (data.percent !== "error") {
-            setTimeout(checkProgress, 1000);
+        if (data.error) {
+            document.getElementById("status").innerText = data.error;
         } else {
-            document.getElementById("status").innerText = data.speed;
+            document.getElementById("status").innerText = "Download completed!";
         }
+    })
+    .catch(err => {
+        document.getElementById("status").innerText = "Error: " + err;
     });
 }
+
 </script>
 
 </body>
