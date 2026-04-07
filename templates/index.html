@@ -11,11 +11,12 @@
         }
 
         .box {
-            margin: 100px auto;
-            width: 400px;
+            margin: 80px auto;
+            width: 420px;
             padding: 30px;
             border-radius: 20px;
             background: #111827;
+            box-shadow: 0 0 25px rgba(0,0,0,0.5);
         }
 
         input {
@@ -27,22 +28,31 @@
         }
 
         button {
-            padding: 10px 20px;
+            padding: 10px 15px;
             border-radius: 10px;
             border: none;
             background: #3b82f6;
             color: white;
             cursor: pointer;
+            margin: 5px;
         }
 
-        .btns button {
-            margin: 5px;
+        button:hover {
+            background: #2563eb;
         }
 
         img {
             width: 100%;
             border-radius: 10px;
             margin-top: 10px;
+        }
+
+        .formats {
+            margin-top: 10px;
+        }
+
+        #status {
+            margin-top: 15px;
         }
     </style>
 </head>
@@ -57,23 +67,24 @@
 
     <div id="previewBox"></div>
 
-    <div class="btns" id="downloadBtns" style="display:none;">
-        <button onclick="download('video','max')">MAX</button>
-        <button onclick="download('video','1080')">1080p</button>
-        <button onclick="download('video','720')">720p</button>
-        <button onclick="download('mp3','128')">MP3</button>
-    </div>
+    <div class="formats" id="formatsBox"></div>
+
+    <button onclick="downloadMP3()">🎵 Download MP3</button>
 
     <p id="status"></p>
 </div>
 
 <script>
+let currentUrl = "";
+
 function preview(){
     let url = document.getElementById("url").value;
+    currentUrl = url;
 
     fetch("/info?url=" + url)
     .then(res => res.json())
     .then(data => {
+
         if(data.error){
             document.getElementById("status").innerText = data.error;
             return;
@@ -84,33 +95,46 @@ function preview(){
             <img src="${data.thumbnail}">
         `;
 
-        document.getElementById("downloadBtns").style.display = "block";
+        let html = "";
+
+        data.formats.forEach(f => {
+            html += `<button onclick="downloadVideo('${f.height}')">${f.quality}</button>`;
+        });
+
+        document.getElementById("formatsBox").innerHTML = html;
     });
 }
 
-function download(type, quality){
-    let url = document.getElementById("url").value;
+function downloadVideo(quality){
+    startDownload("video", quality);
+}
 
+function downloadMP3(){
+    startDownload("mp3", "128");
+}
+
+function startDownload(type, quality){
     fetch("/download", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-            url: url,
+            url: currentUrl,
             type: type,
             quality: quality
         })
     })
     .then(res => res.json())
     .then(data => {
-        checkProgress(data.id);
+        track(data.id);
     });
 }
 
-function checkProgress(id){
+function track(id){
     let interval = setInterval(() => {
         fetch("/progress/" + id)
         .then(res => res.json())
         .then(data => {
+
             document.getElementById("status").innerText =
                 data.percent + " " + data.speed;
 
