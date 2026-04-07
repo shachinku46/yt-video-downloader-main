@@ -13,9 +13,6 @@ if not os.path.exists(DOWNLOAD_FOLDER):
 
 progress_data = {}
 
-FFMPEG_PATH = "ffmpeg"  # Works on Render
-
-
 # ---------------- HOME ----------------
 @app.route("/")
 def home():
@@ -30,7 +27,7 @@ def info():
     try:
         ydl_opts = {
             'quiet': True,
-            'cookiefile': 'cookies.txt'   # ✅ FIXED
+            'cookiefile': 'cookies.txt'   # ✅ IMPORTANT
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -39,8 +36,6 @@ def info():
         return jsonify({
             "title": data.get("title"),
             "thumbnail": data.get("thumbnail"),
-            "uploader": data.get("uploader"),
-            "duration": data.get("duration_string")
         })
 
     except Exception as e:
@@ -52,12 +47,9 @@ def download_task(url, file_id, format_type, quality):
 
     def hook(d):
         if d['status'] == 'downloading':
-            percent = d.get('_percent_str', '0%').replace(' ', '')
-            speed = d.get('_speed_str', '')
-
             progress_data[file_id] = {
-                "percent": percent,
-                "speed": speed
+                "percent": d.get('_percent_str', '0%'),
+                "speed": d.get('_speed_str', '')
             }
 
         elif d['status'] == 'finished':
@@ -71,10 +63,9 @@ def download_task(url, file_id, format_type, quality):
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
-                'ffmpeg_location': FFMPEG_PATH,
                 'progress_hooks': [hook],
-                'noplaylist': True,
-                'cookiefile': 'cookies.txt',   # ✅ IMPORTANT
+                'cookiefile': 'cookies.txt',
+
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -91,10 +82,8 @@ def download_task(url, file_id, format_type, quality):
             ydl_opts = {
                 'format': fmt,
                 'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
-                'ffmpeg_location': FFMPEG_PATH,
                 'progress_hooks': [hook],
-                'noplaylist': True,
-                'cookiefile': 'cookies.txt',   # ✅ IMPORTANT
+                'cookiefile': 'cookies.txt',
             }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
