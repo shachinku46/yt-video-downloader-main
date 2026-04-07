@@ -14,8 +14,7 @@ if not os.path.exists(DOWNLOAD_FOLDER):
 progress_data = {}
 
 # ✅ YOUR CORRECT FFMPEG PATH
-FFMPEG_PATH = r"C:\Users\Sachin_Boss\Documents\ffmpeg-8.1-essentials_build\ffmpeg-8.1-essentials_build\bin"
-
+FFMPEG_PATH = "ffmpeg"
 
 # ---------------- HOME ----------------
 @app.route("/")
