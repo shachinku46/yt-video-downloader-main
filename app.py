@@ -27,7 +27,7 @@ def info():
     try:
         ydl_opts = {
             'quiet': True,
-            'cookiefile': 'cookies.txt'   # ✅ IMPORTANT
+            'cookiefile': 'cookies.txt'
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -65,7 +65,6 @@ def download_task(url, file_id, format_type, quality):
                 'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
                 'progress_hooks': [hook],
                 'cookiefile': 'cookies.txt',
-
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -74,16 +73,18 @@ def download_task(url, file_id, format_type, quality):
             }
 
         else:
+            # ✅ SAFE FORMAT (NO ERROR)
             if quality == "max":
                 fmt = "bestvideo+bestaudio/best"
             else:
-                fmt = f"bestvideo[height<={quality}]+bestaudio/best"
+                fmt = f"bestvideo[height<={quality}]+bestaudio/best/best"
 
             ydl_opts = {
                 'format': fmt,
                 'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
                 'progress_hooks': [hook],
                 'cookiefile': 'cookies.txt',
+                'merge_output_format': 'mp4'
             }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
