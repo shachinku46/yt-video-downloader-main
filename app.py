@@ -33,9 +33,26 @@ def info():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             data = ydl.extract_info(url, download=False)
 
+        formats = []
+        seen = set()
+
+        for f in data.get("formats", []):
+            if f.get("height") and f.get("ext") == "mp4":
+                h = f.get("height")
+
+                if h not in seen:
+                    seen.add(h)
+                    formats.append({
+                        "quality": f"{h}p",
+                        "height": h
+                    })
+
+        formats = sorted(formats, key=lambda x: x["height"], reverse=True)
+
         return jsonify({
             "title": data.get("title"),
             "thumbnail": data.get("thumbnail"),
+            "formats": formats
         })
 
     except Exception as e:
@@ -73,11 +90,8 @@ def download_task(url, file_id, format_type, quality):
             }
 
         else:
-            # ✅ SAFE FORMAT (NO ERROR)
-            if quality == "max":
-                fmt = "bestvideo+bestaudio/best"
-            else:
-                fmt = f"bestvideo[height<={quality}]+bestaudio/best/best"
+            # ✅ SMART SAFE FORMAT
+            fmt = f"bestvideo[height<={quality}]+bestaudio/best/best"
 
             ydl_opts = {
                 'format': fmt,
