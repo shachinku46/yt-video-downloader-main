@@ -8,13 +8,15 @@ app = Flask(__name__)
 
 DOWNLOAD_FOLDER = "downloads"
 
+# Create downloads folder if not exists
 if not os.path.exists(DOWNLOAD_FOLDER):
     os.makedirs(DOWNLOAD_FOLDER)
 
 progress_data = {}
 
-# ✅ YOUR CORRECT FFMPEG PATH
+# ✅ IMPORTANT: For Render / Hosting
 FFMPEG_PATH = "ffmpeg"
+
 
 # ---------------- HOME ----------------
 @app.route("/")
@@ -69,12 +71,13 @@ def download_task(url, file_id, format_type, quality):
                 'ffmpeg_location': FFMPEG_PATH,
                 'progress_hooks': [hook],
                 'noplaylist': True,
+                'quiet': True,
                 'http_chunk_size': 10485760,
 
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
-                    'preferredquality': quality,   # ✅ dynamic quality
+                    'preferredquality': quality,
                 }],
             }
 
@@ -90,13 +93,17 @@ def download_task(url, file_id, format_type, quality):
                 'ffmpeg_location': FFMPEG_PATH,
                 'progress_hooks': [hook],
                 'noplaylist': True,
+                'quiet': True,
             }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
     except Exception as e:
-        progress_data[file_id] = {"percent": "error", "speed": str(e)}
+        progress_data[file_id] = {
+            "percent": "error",
+            "speed": str(e)
+        }
 
 
 # ---------------- START DOWNLOAD ----------------
@@ -112,7 +119,10 @@ def download():
 
     progress_data[file_id] = {"percent": "0%", "speed": ""}
 
-    threading.Thread(target=download_task, args=(url, file_id, format_type, quality)).start()
+    threading.Thread(
+        target=download_task,
+        args=(url, file_id, format_type, quality)
+    ).start()
 
     return jsonify({"id": file_id})
 
@@ -120,7 +130,10 @@ def download():
 # ---------------- PROGRESS ----------------
 @app.route("/progress/<file_id>")
 def progress(file_id):
-    return jsonify(progress_data.get(file_id, {"percent": "0%", "speed": ""}))
+    return jsonify(progress_data.get(file_id, {
+        "percent": "0%",
+        "speed": ""
+    }))
 
 
 # ---------------- DOWNLOAD FILE ----------------
