@@ -13,14 +13,16 @@ if not os.path.exists(DOWNLOAD_FOLDER):
 
 progress_data = {}
 
-FFMPEG_PATH = "ffmpeg"
+FFMPEG_PATH = "ffmpeg"  # Works on Render
 
 
+# ---------------- HOME ----------------
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
+# ---------------- VIDEO INFO ----------------
 @app.route("/info")
 def info():
     url = request.args.get("url")
@@ -28,7 +30,7 @@ def info():
     try:
         ydl_opts = {
             'quiet': True,
-            'cookiefile': 'cookies.txt'   # ✅ important
+            'cookiefile': 'cookies.txt'   # ✅ FIXED
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -45,14 +47,19 @@ def info():
         return jsonify({"error": str(e)})
 
 
+# ---------------- DOWNLOAD THREAD ----------------
 def download_task(url, file_id, format_type, quality):
 
     def hook(d):
         if d['status'] == 'downloading':
+            percent = d.get('_percent_str', '0%').replace(' ', '')
+            speed = d.get('_speed_str', '')
+
             progress_data[file_id] = {
-                "percent": d.get('_percent_str', '0%').strip(),
-                "speed": d.get('_speed_str', '')
+                "percent": percent,
+                "speed": speed
             }
+
         elif d['status'] == 'finished':
             progress_data[file_id] = {
                 "percent": "100%",
@@ -66,10 +73,8 @@ def download_task(url, file_id, format_type, quality):
                 'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
                 'ffmpeg_location': FFMPEG_PATH,
                 'progress_hooks': [hook],
-                'quiet': True,
                 'noplaylist': True,
-                'cookiefile': 'cookies.txt',
-
+                'cookiefile': 'cookies.txt',   # ✅ IMPORTANT
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -78,16 +83,18 @@ def download_task(url, file_id, format_type, quality):
             }
 
         else:
-            fmt = "bestvideo+bestaudio/best" if quality == "max" else f"bestvideo[height<={quality}]+bestaudio/best"
+            if quality == "max":
+                fmt = "bestvideo+bestaudio/best"
+            else:
+                fmt = f"bestvideo[height<={quality}]+bestaudio/best"
 
             ydl_opts = {
                 'format': fmt,
                 'outtmpl': f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s',
                 'ffmpeg_location': FFMPEG_PATH,
                 'progress_hooks': [hook],
-                'quiet': True,
                 'noplaylist': True,
-                'cookiefile': 'cookies.txt',
+                'cookiefile': 'cookies.txt',   # ✅ IMPORTANT
             }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -97,26 +104,31 @@ def download_task(url, file_id, format_type, quality):
         progress_data[file_id] = {"percent": "error", "speed": str(e)}
 
 
+# ---------------- START DOWNLOAD ----------------
 @app.route("/download", methods=["POST"])
 def download():
     data = request.json
 
+    url = data.get("url")
+    format_type = data.get("type")
+    quality = data.get("quality")
+
     file_id = str(uuid.uuid4())
+
     progress_data[file_id] = {"percent": "0%", "speed": ""}
 
-    threading.Thread(
-        target=download_task,
-        args=(data.get("url"), file_id, data.get("type"), data.get("quality"))
-    ).start()
+    threading.Thread(target=download_task, args=(url, file_id, format_type, quality)).start()
 
     return jsonify({"id": file_id})
 
 
+# ---------------- PROGRESS ----------------
 @app.route("/progress/<file_id>")
 def progress(file_id):
     return jsonify(progress_data.get(file_id, {"percent": "0%", "speed": ""}))
 
 
+# ---------------- DOWNLOAD FILE ----------------
 @app.route("/file/<file_id>")
 def file(file_id):
     for f in os.listdir(DOWNLOAD_FOLDER):
@@ -125,5 +137,6 @@ def file(file_id):
     return "File not found"
 
 
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(debug=True)
