@@ -17,6 +17,10 @@ body {
     border: 1px solid rgba(255,255,255,0.1);
 }
 
+.btn {
+    transition: 0.2s;
+}
+
 .btn:hover {
     transform: scale(1.05);
 }
@@ -31,31 +35,35 @@ body {
 ⚡ YT Downloader Pro
 </h1>
 
+<!-- INPUT -->
 <input id="url"
 class="w-full p-4 rounded-xl bg-black/40 border border-gray-600"
 placeholder="Paste YouTube URL...">
 
+<!-- PREVIEW BUTTON -->
 <button onclick="preview()"
-class="w-full mt-5 p-3 rounded-xl bg-blue-600">
+class="btn w-full mt-5 p-3 rounded-xl bg-blue-600">
 Preview
 </button>
 
+<!-- LOADING -->
 <p id="loading" class="text-center mt-3 hidden text-blue-400">Loading...</p>
 
+<!-- PREVIEW SECTION -->
 <div id="previewBox" class="hidden mt-8 text-center">
 
 <h2 id="title" class="text-lg sm:text-xl mb-4"></h2>
 
 <img id="thumb" class="rounded-xl w-full max-w-xs mx-auto">
 
+<!-- VIDEO BUTTONS -->
 <div class="flex flex-wrap justify-center gap-2 mt-5">
-
 <button onclick="download('video','max')" class="bg-green-500 px-3 py-2 rounded">MAX</button>
 <button onclick="download('video','1080')" class="bg-blue-500 px-3 py-2 rounded">1080p</button>
 <button onclick="download('video','720')" class="bg-blue-400 px-3 py-2 rounded">720p</button>
-
 </div>
 
+<!-- MP3 QUALITY -->
 <div class="mt-4">
 <p class="mb-2">MP3 Quality</p>
 
@@ -64,22 +72,21 @@ Preview
 <button onclick="download('mp3','192')" class="bg-yellow-500 px-3 py-1 rounded">192</button>
 <button onclick="download('mp3','320')" class="bg-yellow-600 px-3 py-1 rounded">320</button>
 </div>
-
 </div>
 
+<!-- THUMBNAIL -->
 <button onclick="downloadThumb()" class="mt-4 bg-purple-500 px-4 py-2 rounded">
 Download Thumbnail
 </button>
 
+<!-- PROGRESS -->
 <div class="mt-6">
-
 <div class="w-full h-4 bg-gray-700 rounded">
 <div id="bar" class="h-full bg-blue-500" style="width:0%"></div>
 </div>
 
 <p id="percent" class="mt-2 text-sm">0%</p>
 <p id="speed" class="text-xs text-gray-300"></p>
-
 </div>
 
 </div>
@@ -92,13 +99,13 @@ async function preview(){
     let url = document.getElementById("url").value;
 
     if(!url){
-        alert("Enter URL");
+        alert("Enter URL first");
         return;
     }
 
     document.getElementById("loading").classList.remove("hidden");
 
-    let res = await fetch("/info?url="+encodeURIComponent(url));
+    let res = await fetch("/info?url=" + encodeURIComponent(url));
     let data = await res.json();
 
     document.getElementById("loading").classList.add("hidden");
@@ -113,13 +120,18 @@ async function preview(){
     document.getElementById("thumb").src = data.thumbnail;
 }
 
-async function download(type,quality){
+async function download(type, quality){
     let url = document.getElementById("url").value;
 
-    let res = await fetch("/download",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({url,type,quality})
+    if(!url){
+        alert("Enter URL first");
+        return;
+    }
+
+    let res = await fetch("/download", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({url, type, quality})
     });
 
     let data = await res.json();
@@ -127,9 +139,9 @@ async function download(type,quality){
 }
 
 function track(id){
-    let interval = setInterval(async()=>{
+    let interval = setInterval(async () => {
 
-        let res = await fetch("/progress/"+id);
+        let res = await fetch("/progress/" + id);
         let data = await res.json();
 
         if(data.percent === "error"){
@@ -140,16 +152,16 @@ function track(id){
 
         let p = parseFloat(data.percent.replace("%","")) || 0;
 
-        document.getElementById("bar").style.width = p+"%";
+        document.getElementById("bar").style.width = p + "%";
         document.getElementById("percent").innerText = data.percent;
         document.getElementById("speed").innerText = data.speed;
 
-        if(p>=100){
+        if(p >= 100){
             clearInterval(interval);
-            window.location.href="/file/"+id;
+            window.location.href = "/file/" + id;
         }
 
-    },700);
+    }, 700);
 }
 
 function downloadThumb(){
